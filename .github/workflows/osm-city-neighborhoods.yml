@@ -306,14 +306,25 @@ jobs:
                 (($x.keepOperators // [])[] | "--operator\t" + .)' \
                 transit-hub-filters.json 2>/dev/null || true)
                 fi
-                python scripts/extract_transit_hubs.py \
-                --city "$SLUG" --extract "$ex" --pbf "$pbf" --bbox="$BBOX_LL" \
-                "${targs[@]}" --out "work/out/$SLUG/transit-stations.json" \
-                >/dev/null 2>&1 || rm -f "work/out/$SLUG/transit-stations.json"
-                python scripts/extract_transit_lines.py \
-                --city "$SLUG" --extract "$ex" --pbf "$pbf" --bbox="$BBOX_LL" \
-                "${targs[@]}" --out "work/out/$SLUG/transit-lines.json" \
-                >/dev/null 2>&1 || rm -f "work/out/$SLUG/transit-lines.json"
+                mkdir -p "work/out/$SLUG"
+                if python scripts/extract_transit_hubs.py \
+                     --city "$SLUG" --extract "$ex" --pbf "$pbf" --bbox="$BBOX_LL" \
+                     "${targs[@]}" --out "work/out/$SLUG/transit-stations.json" \
+                     >"work/out/$SLUG/transit-hubs.log" 2>&1; then
+                  echo "  $SLUG transit stations: $(wc -c < "work/out/$SLUG/transit-stations.json") bytes"
+                else
+                  echo "::warning::transit stations failed for $SLUG (transit-hubs.log)"
+                  tail -n 3 "work/out/$SLUG/transit-hubs.log" || true
+                fi
+                if python scripts/extract_transit_lines.py \
+                     --city "$SLUG" --extract "$ex" --pbf "$pbf" --bbox="$BBOX_LL" \
+                     "${targs[@]}" --out "work/out/$SLUG/transit-lines.json" \
+                     >"work/out/$SLUG/transit-lines.log" 2>&1; then
+                  echo "  $SLUG transit lines: $(wc -c < "work/out/$SLUG/transit-lines.json") bytes"
+                else
+                  echo "::warning::transit lines failed for $SLUG (transit-lines.log)"
+                  tail -n 3 "work/out/$SLUG/transit-lines.log" || true
+                fi
 
 
               # Real OSM road geometry for the atlas Popular Streets tab, cut
