@@ -309,6 +309,33 @@ jobs:
                 --pbf "$pbf" --bbox="$bbox" \
                 --out-dir "work/out/$slug" >/dev/null 2>&1 \
                 || { rm -f "$pbf"; echo -1; return; }
+                # Transit stations + route geometry, reusing the city PBF cut above.
+                #
+                # Kept deliberately plain: no arrays, no command substitution, no nested quotes.
+                # An earlier version of this block reported a green run having written nothing,
+                # and the shell machinery is what hid that.
+                #
+                # The registry gives bbox as minLng,minLat,maxLng,maxLat and these extractors
+                # want minLat,minLon,maxLat,maxLon. Swapping by hand with ${var#*,} expansion
+                # transposed the tail, which is still a well-formed bbox: it returned 0
+                # stations without failing. Split on commas instead so a pair cannot be swapped.
+                # --filters resolves the per-city network/operator rules inside the script.
+                IFS=',' read -r lon1 lat1 lon2 lat2 <<< "$bbox"
+                BBOX_LL="$lat1,$lon1,$lat2,$lon2"
+                mkdir -p work/out/$SLUG
+                python scripts/extract_transit_hubs.py --city $SLUG --extract $ex \
+                --pbf $pbf --bbox=$BBOX_LL \
+                --filters transit-hub-filters.json \
+                --out work/out/$SLUG/transit-stations.json \
+                >work/out/$SLUG/transit-hubs.log 2>&1 \
+                || echo ::warning=transit-stations-failed-for-$SLUG
+                python scripts/extract_transit_lines.py --city $SLUG --extract $ex \
+                --pbf $pbf --bbox=$BBOX_LL \
+                --filters transit-hub-filters.json \
+                --out work/out/$SLUG/transit-lines.json \
+                >work/out/$SLUG/transit-lines.log 2>&1 \
+                || echo ::warning=transit-lines-failed-for-$SLUG
+                ls -l work/out/$SLUG/transit-stations.json work/out/$SLUG/transit-lines.json || true
 
               # Real OSM road geometry for the atlas Popular Streets tab, cut
               # from the same city PBF the boundaries came from.
